@@ -1,0 +1,46 @@
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import CustomerLogin from './Pages/CustomerLogin';
+import CustomerHome from './Pages/CustomerHome';
+import CustomerRegister from './Pages/CustomerRegister';
+import CustomerMedications from './Pages/CustomerMedications';
+import CustomerMedicationDetails from './Pages/CustomerMedicationDetails';
+import CustomerPrescriptions from './Pages/CustomerPrescriptions';
+import CustomerCart from './Pages/CustomerCart';
+import CustomerCheckout from './Pages/CustomerCheckout';
+import CustomerOrders from './Pages/CustomerOrders';
+import CustomerOrderTracking from './Pages/CustomerOrderTracking';
+import OrderSuccess from './Pages/OrderSuccess';
+import PharmacistDashboard from './Pages/PharmacistDashboard';
+import PharmacistInventory from './Pages/PharmacistInventory';
+import PharmacistAddMedication from './Pages/PharmacistAddMedication';
+import PharmacistEditMedication from './Pages/PharmacistEditMedication';
+import CustomerProfile from './Pages/CustomerProfile';
+
+function App() {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<CustomerHome />} />
+        <Route path="/login" element={<CustomerLogin />} />
+        <Route path="/register" element={<CustomerRegister />} />
+        <Route path="/medications" element={<CustomerMedications />} />
+        <Route path="/medications/:id" element={<CustomerMedicationDetails />} />
+        <Route path="/prescriptions" element={<CustomerPrescriptions />} />
+        <Route path="/cart" element={<CustomerCart />} />
+        <Route path="/checkout" element={<CustomerCheckout />} />
+        <Route path="/orders" element={<CustomerOrders />} />
+        <Route path="/orders/:id" element={<CustomerOrderTracking />} />
+        <Route path="/order-success" element={<OrderSuccess />} />
+        <Route path="/pharmacist" element={<PharmacistDashboard />} />
+        <Route path="/pharmacist/inventory" element={<PharmacistInventory />} />
+        <Route path="/pharmacist/add-medication" element={<PharmacistAddMedication />} />
+        <Route path="/pharmacist/edit-medication/:id" element={<PharmacistEditMedication />} />
+        <Route path="/profile" element={<CustomerProfile />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Router>
+  );
+}
+
+export default App;
