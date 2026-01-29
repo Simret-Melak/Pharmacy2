@@ -9,6 +9,7 @@ const path = require('path');
 const guestRoutes = require('./routes/guestRoutes');
 const profileRoutes = require('./routes/profileRoutes'); 
 const pharmacyRoutes = require('./routes/pharmacyRoutes');
+const chatbotRoutes = require('./routes/chatbotRoutes'); 
 
 dotenv.config();
 
@@ -81,6 +82,9 @@ app.use('/api/prescriptions', require('./routes/prescriptionRoutes'));
 // ✅ ADMIN ROUTES
 app.use('/api/admin', require('./routes/adminRoutes'));
 
+// ✅ CHATBOT ROUTES 
+app.use('/api/chatbot', chatbotRoutes);
+
 // Serve static files from uploads directory
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
@@ -121,5 +125,6 @@ app.listen(PORT, () => {
   console.log(`   - Medications: http://localhost:${PORT}/api/medications`);
   console.log(`   - Prescriptions: http://localhost:${PORT}/api/prescriptions`);
   console.log(`   - Admin: http://localhost:${PORT}/api/admin`);
+  console.log(`   - Chatbot: http://localhost:${PORT}/api/chatbot`); 
   console.log(`   - Health: http://localhost:${PORT}/health`);
 });
