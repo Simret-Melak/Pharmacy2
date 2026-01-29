@@ -16,6 +16,7 @@ import CustomerOrders from './Pages/CustomerOrders';
 import CustomerOrderTracking from './Pages/CustomerOrderTracking';
 import OrderSuccess from './Pages/OrderSuccess';
 import CustomerProfile from './Pages/CustomerProfile';
+import ChatbotPage from './Pages/ChatbotPage';
 
 // Pharmacist Pages
 import PharmacistDashboard from './Pages/PharmacistDashboard';
@@ -100,6 +101,7 @@ function App() {
           <Route path="/orders/:id" element={<CustomerOrderTracking />} />
           <Route path="/order-success" element={<OrderSuccess />} />
           <Route path="/profile" element={<CustomerProfile />} />
+          <Route path="/chatbot" element={<ChatbotPage />} />
           
           {/* ========== PHARMACIST ROUTES ========== */}
           <Route path="/pharmacist" element={<PharmacistDashboard />} />

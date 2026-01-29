@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
 import CustomerHeader from '@/components/customer/CustomerHeader';
 import CustomerFooter from '@/components/customer/CustomerFooter';
 import MedicationCard from '@/components/ui-custom/MedicationCard'; 
@@ -20,7 +21,18 @@ import {
   Baby,
   Eye,
   Loader2,
-  ShoppingCart
+  ShoppingCart,
+  MessageCircle,
+  Bot,
+  User,
+  Send,
+  X,
+  Sparkles,
+  HelpCircle,
+  Phone,
+  CreditCard,
+  Calendar,
+  Star
 } from 'lucide-react';
 import { api } from '@/utils/api';
 
@@ -33,12 +45,329 @@ const categories = [
   { name: 'Eye Care', icon: Eye, color: 'bg-cyan-100 text-cyan-600' },
 ];
 
+// Chatbot component that uses your backend Gemini API
+const Chatbot = ({ onClose }) => {
+  const [messages, setMessages] = useState([
+    {
+      role: 'bot',
+      text: "👋 Hello! I'm PharmaBot, your Addis Pharmacy assistant. I can help with:\n• Store hours & location\n• Prescription refills\n• Delivery options\n• General pharmacy information\n• Payment methods\n• Emergency contacts\n\nHow can I help you today?",
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    }
+  ]);
+  const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
+  const [sessionId] = useState(() => 
+    'chat_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
+  );
+  const messagesEndRef = useRef(null);
+
+  // Quick action questions
+  const quickActions = [
+    { icon: <Clock className="h-4 w-4" />, text: 'Store Hours', question: 'What are your store hours?' },
+    { icon: <Truck className="h-4 w-4" />, text: 'Delivery', question: 'Do you deliver medications?' },
+    { icon: <Pill className="h-4 w-4" />, text: 'Prescription', question: 'How do I refill a prescription?' },
+    { icon: <CreditCard className="h-4 w-4" />, text: 'Payment', question: 'What payment methods do you accept?' },
+    { icon: <HelpCircle className="h-4 w-4" />, text: 'Weekends', question: 'Are you open on weekends?' },
+    { icon: <Shield className="h-4 w-4" />, text: 'Emergency', question: 'What should I do in a medication emergency?' },
+  ];
+
+  // Auto-scroll to bottom
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  const sendMessage = async (customMessage = null) => {
+    const messageToSend = customMessage || input.trim();
+    
+    if (!messageToSend) return;
+
+    // Add user message
+    const userMessage = {
+      role: 'user',
+      text: messageToSend,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+    
+    setMessages(prev => [...prev, userMessage]);
+    
+    if (!customMessage) {
+      setInput('');
+    }
+
+    setIsLoading(true);
+    setIsTyping(true);
+
+    try {
+      // Call your backend Gemini API
+      const response = await api.post('/chatbot/chat', {
+        message: messageToSend,
+        sessionId
+      });
+
+      if (response.success) {
+        const botMessage = {
+          role: 'bot',
+          text: response.reply,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+        
+        setMessages(prev => [...prev, botMessage]);
+      } else {
+        // Fallback response if API fails
+        const errorMessage = {
+          role: 'bot',
+          text: "I apologize, I'm having trouble connecting. Please call us at (555) 123-4567 for assistance.",
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+        setMessages(prev => [...prev, errorMessage]);
+      }
+    } catch (error) {
+      console.error('Chatbot API error:', error);
+      
+      // Fallback responses
+      let fallbackResponse = "I'm experiencing technical difficulties. Please call our pharmacy directly at (555) 123-4567.";
+      
+      if (messageToSend.toLowerCase().includes('hour') || messageToSend.toLowerCase().includes('open')) {
+        fallbackResponse = "Our store hours are: Monday-Friday 8AM-10PM, Saturday 9AM-8PM, Sunday 10AM-6PM.";
+      } else if (messageToSend.toLowerCase().includes('deliver')) {
+        fallbackResponse = "We offer free delivery within 5km (2-4 hours). For orders outside 5km, delivery fees apply.";
+      } else if (messageToSend.toLowerCase().includes('prescription')) {
+        fallbackResponse = "You can refill prescriptions by: 1) Uploading on our website/app 2) Calling (555) 123-4567 3) Visiting in person.";
+      }
+      
+      const errorMessage = {
+        role: 'bot',
+        text: fallbackResponse + "\n\nNote: I'm an AI assistant. For medical advice, consult a pharmacist.",
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+      setIsTyping(false);
+    }
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  };
+
+  const handleQuickAction = (question) => {
+    sendMessage(question);
+  };
+
+  const handleEmergency = () => {
+    window.open('tel:911');
+  };
+
+  const handleCallPharmacy = () => {
+    window.open('tel:5551234567');
+  };
+
+  const clearChat = async () => {
+    try {
+      await api.post('/chatbot/clear', { sessionId });
+      setMessages([{
+        role: 'bot',
+        text: "👋 Hello! I'm PharmaBot, your Addis Pharmacy assistant. How can I help you today?",
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }]);
+    } catch (err) {
+      console.error('Failed to clear chat:', err);
+      // Still clear locally
+      setMessages([{
+        role: 'bot',
+        text: "👋 Hello! I'm PharmaBot, your Addis Pharmacy assistant. How can I help you today?",
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }]);
+    }
+  };
+
+  return (
+    <div className="fixed bottom-6 right-6 w-96 max-w-[calc(100vw-48px)] bg-white shadow-2xl rounded-2xl border border-emerald-200 flex flex-col overflow-hidden z-50">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-semibold rounded-t-2xl">
+        <div className="flex items-center gap-2">
+          <Bot className="h-5 w-5" />
+          <span>PharmaBot Assistant</span>
+          <Sparkles className="h-4 w-4 text-yellow-300" />
+        </div>
+        <div className="flex items-center gap-1">
+          <Button
+            onClick={clearChat}
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 hover:bg-white/20 rounded-full text-xs"
+            title="Clear chat"
+          >
+            ↺
+          </Button>
+          <Button
+            onClick={onClose}
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 hover:bg-white/20 rounded-full"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Messages Container */}
+      <div className="flex-1 p-4 overflow-y-auto h-80 bg-slate-50">
+        {messages.map((msg, idx) => (
+          <div
+            key={idx}
+            className={`mb-4 ${msg.role === 'user' ? 'text-right' : 'text-left'}`}
+          >
+            <div className={`inline-flex max-w-[85%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+              <div className={`flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center ${
+                msg.role === 'user' 
+                  ? 'bg-emerald-600 ml-3' 
+                  : 'bg-slate-100 mr-3'
+              }`}>
+                {msg.role === 'user' ? (
+                  <User className="h-4 w-4 text-white" />
+                ) : (
+                  <Bot className="h-4 w-4 text-slate-600" />
+                )}
+              </div>
+              <div>
+                <div className={`rounded-2xl px-4 py-3 whitespace-pre-line text-sm ${
+                  msg.role === 'user'
+                    ? 'bg-emerald-600 text-white rounded-br-none'
+                    : 'bg-white text-slate-800 border border-slate-200 rounded-bl-none shadow-sm'
+                }`}>
+                  {msg.text}
+                </div>
+                <div className={`text-xs text-slate-500 mt-1 ${
+                  msg.role === 'user' ? 'text-right' : 'text-left'
+                }`}>
+                  {msg.timestamp}
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+        
+        {isTyping && (
+          <div className="flex items-center gap-2 text-slate-500 text-sm">
+            <Bot className="h-4 w-4" />
+            <div className="flex gap-1">
+              <div className="h-2 w-2 bg-slate-400 rounded-full animate-bounce" />
+              <div className="h-2 w-2 bg-slate-400 rounded-full animate-bounce delay-100" />
+              <div className="h-2 w-2 bg-slate-400 rounded-full animate-bounce delay-200" />
+            </div>
+            <span>PharmaBot is typing...</span>
+          </div>
+        )}
+        
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Quick Actions */}
+      {messages.length <= 2 && (
+        <div className="px-4 pt-2 pb-3 border-t border-slate-200">
+          <p className="text-xs text-slate-500 mb-2 font-medium">Quick questions:</p>
+          <div className="flex flex-wrap gap-2">
+            {quickActions.map((action, idx) => (
+              <Button
+                key={idx}
+                onClick={() => handleQuickAction(action.question)}
+                variant="outline"
+                size="sm"
+                className="text-xs border-emerald-200 text-emerald-700 hover:bg-emerald-50 h-8"
+              >
+                {action.icon}
+                <span className="ml-1">{action.text}</span>
+              </Button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Input Area */}
+      <div className="border-t border-slate-200 p-4 bg-white">
+        <div className="space-y-3">
+          <div className="relative">
+            <Textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyPress}
+              placeholder="Ask about store hours, prescriptions, delivery..."
+              className="min-h-[60px] resize-none border-slate-300 focus:border-emerald-500 focus:ring-emerald-500 pr-12 text-sm"
+              disabled={isLoading}
+            />
+            <Button
+              onClick={() => sendMessage()}
+              disabled={isLoading || !input.trim()}
+              className="absolute right-2 bottom-2 h-8 w-8 p-0 bg-emerald-600 hover:bg-emerald-700"
+              size="icon"
+            >
+              {isLoading ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Send className="h-3 w-3" />
+              )}
+            </Button>
+          </div>
+          
+          {/* Emergency & Info */}
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1 text-red-600 border-red-200 hover:bg-red-50 text-xs h-8"
+              onClick={handleEmergency}
+            >
+              🚨 Emergency - 911
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1 border-emerald-200 text-emerald-700 hover:bg-emerald-50 text-xs h-8"
+              onClick={handleCallPharmacy}
+            >
+              📞 Call Pharmacy
+            </Button>
+          </div>
+          
+          <div className="text-xs text-slate-500 text-center">
+            <div className="flex items-center justify-center gap-2">
+              <span className="flex items-center gap-1">
+                <Sparkles className="h-3 w-3" />
+                Powered by Gemini AI
+              </span>
+              <span>•</span>
+              <span className="flex items-center gap-1">
+                <Calendar className="h-3 w-3" />
+                24/7 available
+              </span>
+            </div>
+            <p className="mt-1 text-[10px]">
+              ⚠️ For medical advice, consult our pharmacist.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function CustomerHome() {
   const [searchQuery, setSearchQuery] = useState('');
   const [featuredMedications, setFeaturedMedications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [addingToCart, setAddingToCart] = useState({});
+  const [showChatbot, setShowChatbot] = useState(false);
 
   // Fetch featured medications on component mount
   useEffect(() => {
@@ -139,6 +468,10 @@ export default function CustomerHome() {
     } finally {
       setAddingToCart(prev => ({ ...prev, [medication.id]: false }));
     }
+  };
+
+  const handleChatbotToggle = () => {
+    setShowChatbot(!showChatbot);
   };
 
   return (
@@ -339,6 +672,24 @@ export default function CustomerHome() {
       </section>
 
       <CustomerFooter />
+
+      {/* Floating Chatbot Button */}
+      <div className="fixed bottom-6 right-6 z-50">
+        {showChatbot ? (
+          <Chatbot 
+            onClose={() => setShowChatbot(false)}
+          />
+        ) : (
+          <Button
+            onClick={handleChatbotToggle}
+            className="h-14 w-14 rounded-full shadow-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-700 hover:to-teal-600 shadow-lg animate-bounce"
+            size="icon"
+          >
+            <MessageCircle className="h-6 w-6" />
+            <span className="absolute -top-1 -right-1 h-3 w-3 bg-red-500 rounded-full animate-ping" />
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
