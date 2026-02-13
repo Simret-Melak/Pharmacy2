@@ -1,4 +1,3 @@
-
 const { createClient } = require('@supabase/supabase-js');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
@@ -10,34 +9,41 @@ const supabase = createClient(
 );
 
 const authenticateToken = async (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) {
-    return res.status(401).json({ message: 'Access token required' });
-  }
-
   try {
-    // Verify using Supabase
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) {
+      console.log('❌ No token provided for endpoint:', req.originalUrl);
+      return res.status(401).json({ 
+        success: false,
+        message: 'Access token required' 
+      });
+    }
+
+    console.log('🔐 Verifying Supabase token for endpoint:', req.originalUrl);
+
+    // Use Supabase Auth to verify the token
     const { data: { user }, error } = await supabase.auth.getUser(token);
 
     if (error || !user) {
-      console.error('Supabase token verification failed:', error);
-      return res.status(403).json({ message: 'Invalid or expired token' });
+      console.error('❌ Supabase token verification failed:', error?.message || 'No user');
+      return res.status(403).json({ 
+        success: false,
+        message: 'Invalid or expired token' 
+      });
     }
 
-    console.log('🔐 Authenticating user:', user.email);
+    console.log('✅ Supabase session token verified:', user.email);
 
-    // Get user role SOLELY from clients table
-    let userRole = 'user'; // Default for all users
+    // Get user role from clients table
+    let userRole = 'user';
     
     const { data: clientData, error: clientError } = await supabase
       .from('clients')
       .select('role')
       .eq('id', user.id)
       .single();
-
-      console.log('🔍 Client data fetched for role:', clientData, clientError);
 
     if (clientError) {
       console.log('ℹ️ No client record found, using default role: user');
@@ -51,13 +57,21 @@ const authenticateToken = async (req, res, next) => {
       email: user.email,
       ...user.user_metadata,
       role: userRole
-      
     };
+    
+    console.log('✅ Authentication successful:', {
+      email: req.user.email,
+      role: req.user.role,
+      userId: req.user.userId
+    });
     
     next();
   } catch (error) {
-    console.error('Token verification error:', error);
-    return res.status(403).json({ message: 'Invalid or expired token' });
+    console.error('❌ Token verification error:', error.message);
+    return res.status(403).json({ 
+      success: false,
+      message: 'Authentication failed' 
+    });
   }
 };
 
@@ -72,21 +86,30 @@ const requireAdmin = (req, res, next) => {
   });
   
   if (req.user.role !== 'admin') {
-    return res.status(403).json({ message: 'Admin access required' });
+    return res.status(403).json({ 
+      success: false,
+      message: 'Admin access required' 
+    });
   }
   next();
 };
 
 const requirePharmacist = (req, res, next) => {
   if (req.user.role !== 'pharmacist') {
-    return res.status(403).json({ message: 'Pharmacist access required' });
+    return res.status(403).json({ 
+      success: false,
+      message: 'Pharmacist access required' 
+    });
   }
   next();
 };
 
 const requireAdminOrPharmacist = (req, res, next) => {
   if (req.user.role !== 'admin' && req.user.role !== 'pharmacist') {
-    return res.status(403).json({ message: 'Admin or pharmacist access required' });
+    return res.status(403).json({ 
+      success: false,
+      message: 'Admin or pharmacist access required' 
+    });
   }
   next();
 };
@@ -98,10 +121,16 @@ exports.registerUser = async (req, res) => {
   try {
     // Input validation
     if (!email || !password || !username || !full_name) {
-      return res.status(400).json({ message: 'All fields are required' });
+      return res.status(400).json({ 
+        success: false,
+        message: 'All fields are required' 
+      });
     }
     if (password.length < 8) {
-      return res.status(400).json({ message: 'Password must be at least 8 characters' });
+      return res.status(400).json({ 
+        success: false,
+        message: 'Password must be at least 8 characters' 
+      });
     }
 
     // Use Supabase Auth for registration
@@ -121,15 +150,22 @@ exports.registerUser = async (req, res) => {
       console.error('Supabase signup error:', error);
       
       if (error.message.includes('already registered')) {
-        return res.status(400).json({ message: 'Email already in use' });
+        return res.status(400).json({ 
+          success: false,
+          message: 'Email already in use' 
+        });
       }
       
-      return res.status(400).json({ message: error.message });
+      return res.status(400).json({ 
+        success: false,
+        message: error.message 
+      });
     }
 
     console.log('✅ User registered with Supabase Auth');
 
     res.status(201).json({ 
+      success: true,
       message: 'Registration successful! You can now login.',
       email: email,
       user: {
@@ -138,23 +174,28 @@ exports.registerUser = async (req, res) => {
         full_name: full_name,
         phone: phone,
         username: username
-        // No role in response - frontend will get it from protected endpoints
       }
     });
 
   } catch (error) {
     console.error('Registration error:', error);
-    res.status(500).json({ message: 'Registration failed. Please try again.' });
+    res.status(500).json({ 
+      success: false,
+      message: 'Registration failed. Please try again.' 
+    });
   }
 };
 
-// Login User
+// Login User - Returns Supabase session token
 exports.loginUser = async (req, res) => {
   const { email, password } = req.body;
 
   try {
     if (!email || !password) {
-      return res.status(400).json({ message: 'Email and password are required' });
+      return res.status(400).json({ 
+        success: false,
+        message: 'Email and password are required' 
+      });
     }
 
     // Use Supabase Auth for login
@@ -164,18 +205,26 @@ exports.loginUser = async (req, res) => {
     });
 
     if (error) {      
+      console.error('Login error:', error);
+      
       if (error.message.includes('Invalid login credentials')) {
-        return res.status(401).json({ message: 'Invalid credentials' });
+        return res.status(401).json({ 
+          success: false,
+          message: 'Invalid credentials' 
+        });
       }
       
-      return res.status(401).json({ message: error.message });
+      return res.status(401).json({ 
+        success: false,
+        message: error.message 
+      });
     }
 
     const user = data.user;
+    console.log('✅ User logged in:', user.email);
 
-    // Get user role SOLELY from clients table
-    let user_role = "user"; // Default role for all users
-
+    // Get user role from clients table
+    let user_role = "user";
     if (user && user.id) {
       const { data: clientData, error: clientError } = await supabase
         .from('clients')
@@ -183,25 +232,23 @@ exports.loginUser = async (req, res) => {
         .eq('id', user.id)
         .single();
 
-      // If found in clients table, use that role (pharmacist or admin)
-      if (clientData && clientData.role) {
+      if (!clientError && clientData && clientData.role) {
         user_role = clientData.role;
+        console.log('✅ User role from clients table:', user_role);
       }
     }
 
-    // Get user metadata from Supabase Auth
-    const userMetadata = user.user_metadata || {};
-
     res.status(200).json({
+      success: true,
       message: 'Login successful',
-      token: data.session.access_token,
+      token: data.session.access_token, // Supabase session token
       refreshToken: data.session.refresh_token,
       user: {
         id: user.id,
         email: user.email,
-        full_name: userMetadata.full_name || '',
-        phone: userMetadata.phone || '',
-        role: user_role // Only from clients table
+        full_name: user.user_metadata?.full_name || '',
+        phone: user.user_metadata?.phone || '',
+        role: user_role
       },
       clearGuestSession: true
     });
@@ -209,8 +256,8 @@ exports.loginUser = async (req, res) => {
   } catch (error) {
     console.error('💥 LOGIN ERROR:', error);
     res.status(500).json({ 
-      message: 'Login failed. Please try again.',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      success: false,
+      message: 'Login failed. Please try again.'
     });
   }
 };
@@ -221,12 +268,16 @@ exports.logoutUser = async (req, res) => {
     const token = req.headers['authorization']?.split(' ')[1];
     
     if (!token) {
-      return res.status(400).json({ message: 'No token provided' });
+      return res.status(400).json({ 
+        success: false,
+        message: 'No token provided' 
+      });
     }
 
     console.log('✅ User logged out successfully');
     
     res.status(200).json({
+      success: true,
       message: 'Logout successful',
       clearSession: true
     });
@@ -234,8 +285,8 @@ exports.logoutUser = async (req, res) => {
   } catch (error) {
     console.error('Logout error:', error);
     res.status(500).json({ 
-      message: 'Logout failed',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      success: false,
+      message: 'Logout failed'
     });
   }
 };
@@ -248,6 +299,7 @@ exports.deleteUserAccount = async (req, res) => {
 
     if (!email || !password) {
       return res.status(400).json({ 
+        success: false,
         message: 'Email and password confirmation required for account deletion' 
       });
     }
@@ -260,6 +312,7 @@ exports.deleteUserAccount = async (req, res) => {
 
     if (verifyError) {
       return res.status(401).json({ 
+        success: false,
         message: 'Invalid credentials. Cannot delete account.' 
       });
     }
@@ -267,6 +320,7 @@ exports.deleteUserAccount = async (req, res) => {
     // Check if the authenticated user matches the account being deleted
     if (verifyData.user.id !== userId) {
       return res.status(403).json({ 
+        success: false,
         message: 'You can only delete your own account' 
       });
     }
@@ -277,6 +331,7 @@ exports.deleteUserAccount = async (req, res) => {
     if (deleteError) {
       console.error('Account deletion error:', deleteError);
       return res.status(500).json({ 
+        success: false,
         message: 'Failed to delete account. Please try again.' 
       });
     }
@@ -284,6 +339,7 @@ exports.deleteUserAccount = async (req, res) => {
     console.log('✅ User account deleted:', userId);
 
     res.status(200).json({
+      success: true,
       message: 'Account deleted successfully',
       deleted: true
     });
@@ -291,13 +347,13 @@ exports.deleteUserAccount = async (req, res) => {
   } catch (error) {
     console.error('Account deletion error:', error);
     res.status(500).json({ 
-      message: 'Account deletion failed',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      success: false,
+      message: 'Account deletion failed'
     });
   }
 };
 
-// Get All Users (Admin only) - CLEAN VERSION
+// Get All Users (Admin only)
 exports.getAllUsers = async (req, res) => {
   try {
     console.log('🔐 Checking admin access for user:', req.user.email);
@@ -305,7 +361,10 @@ exports.getAllUsers = async (req, res) => {
     
     if (req.user.role !== 'admin') {
       console.log('❌ Admin access denied for user:', req.user.email);
-      return res.status(403).json({ message: 'Admin access required' });
+      return res.status(403).json({ 
+        success: false,
+        message: 'Admin access required' 
+      });
     }
 
     console.log('✅ Admin access granted, fetching users...');
@@ -316,8 +375,8 @@ exports.getAllUsers = async (req, res) => {
     if (authError) {
       console.error('Error fetching users from Auth:', authError);
       return res.status(500).json({ 
-        message: 'Failed to fetch users from authentication system',
-        error: process.env.NODE_ENV === 'development' ? authError.message : undefined
+        success: false,
+        message: 'Failed to fetch users from authentication system'
       });
     }
 
@@ -329,8 +388,8 @@ exports.getAllUsers = async (req, res) => {
     if (clientError) {
       console.error('Error fetching client roles:', clientError);
       return res.status(500).json({ 
-        message: 'Failed to fetch user roles',
-        error: process.env.NODE_ENV === 'development' ? clientError.message : undefined
+        success: false,
+        message: 'Failed to fetch user roles'
       });
     }
 
@@ -350,7 +409,7 @@ exports.getAllUsers = async (req, res) => {
         username: authUser.user_metadata?.username,
         full_name: authUser.user_metadata?.full_name,
         phone: authUser.user_metadata?.phone,
-        role: userRole, // Only from clients table
+        role: userRole,
         email_confirmed: authUser.email_confirmed_at !== null,
         created_at: authUser.created_at,
         last_sign_in: authUser.last_sign_in_at,
@@ -361,6 +420,7 @@ exports.getAllUsers = async (req, res) => {
     console.log(`✅ Admin fetched ${formattedUsers.length} users`);
 
     res.status(200).json({
+      success: true,
       message: 'Users retrieved successfully',
       users: formattedUsers,
       total: formattedUsers.length,
@@ -376,8 +436,8 @@ exports.getAllUsers = async (req, res) => {
   } catch (error) {
     console.error('Get users error:', error);
     res.status(500).json({ 
-      message: 'Failed to fetch users',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      success: false,
+      message: 'Failed to fetch users'
     });
   }
 };
@@ -392,6 +452,7 @@ exports.promoteUser = async (req, res) => {
     
     if (!allowedRoles.includes(role)) {
       return res.status(400).json({ 
+        success: false,
         message: 'Invalid role. Allowed roles: admin, pharmacist' 
       });
     }
@@ -400,16 +461,17 @@ exports.promoteUser = async (req, res) => {
     const { data: userData, error: userError } = await supabase.auth.admin.getUserById(userId);
     
     if (userError || !userData.user) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ 
+        success: false,
+        message: 'User not found' 
+      });
     }
 
     const user = userData.user;
 
-    // ✅ FIXED: Only include fields that exist in clients table
     const clientData = {
       id: userId,
       role: role
-      // Only id and role - no email, username, full_name, phone, pharmacy_id
     };
 
     const { error: clientError } = await supabase
@@ -419,6 +481,7 @@ exports.promoteUser = async (req, res) => {
     if (clientError) {
       console.error('Promotion error:', clientError);
       return res.status(500).json({ 
+        success: false,
         message: 'Failed to promote user' 
       });
     }
@@ -426,18 +489,19 @@ exports.promoteUser = async (req, res) => {
     console.log(`✅ User ${user.email} promoted to: ${role}`);
 
     res.status(200).json({
+      success: true,
       message: `User successfully promoted to ${role}`,
       user: {
         id: userId,
         email: user.email,
         role: role
-        // No pharmacy_id since it's not in clients table
       }
     });
 
   } catch (error) {
     console.error('Promotion error:', error);
     res.status(500).json({ 
+      success: false,
       message: 'Failed to promote user'
     });
   }
@@ -457,6 +521,7 @@ exports.demoteUser = async (req, res) => {
     if (clientError) {
       console.error('Demotion error:', clientError);
       return res.status(500).json({ 
+        success: false,
         message: 'Failed to demote user' 
       });
     }
@@ -464,6 +529,7 @@ exports.demoteUser = async (req, res) => {
     console.log(`✅ User ${userId} demoted to regular user`);
 
     res.status(200).json({
+      success: true,
       message: 'User successfully demoted to regular user',
       userId: userId
     });
@@ -471,23 +537,25 @@ exports.demoteUser = async (req, res) => {
   } catch (error) {
     console.error('Demotion error:', error);
     res.status(500).json({ 
+      success: false,
       message: 'Failed to demote user'
     });
   }
 };
 
-// Admin Delete Any User Account - FIXED
+// Admin Delete Any User Account
 exports.adminDeleteUser = async (req, res) => {
   try {
     const { userId } = req.params;
 
     if (!userId) {
       return res.status(400).json({ 
+        success: false,
         message: 'User ID is required' 
       });
     }
 
-    // ✅ FIRST: Check if user exists in clients table (admin/pharmacist)
+    // Check if user exists in clients table (admin/pharmacist)
     const { data: clientData, error: clientCheckError } = await supabase
       .from('clients')
       .select('role')
@@ -495,11 +563,10 @@ exports.adminDeleteUser = async (req, res) => {
       .single();
 
     if (clientCheckError && clientCheckError.code !== 'PGRST116') {
-      // PGRST116 means "no rows returned" - that's fine, user might not be in clients table
       console.error('Error checking clients table:', clientCheckError);
     }
 
-    // ✅ SECOND: Delete user from clients table if they exist there
+    // Delete user from clients table if they exist there
     if (clientData) {
       const { error: clientDeleteError } = await supabase
         .from('clients')
@@ -508,38 +575,38 @@ exports.adminDeleteUser = async (req, res) => {
 
       if (clientDeleteError) {
         console.error('Error deleting from clients table:', clientDeleteError);
-        // Don't return error here - still try to delete from Auth
       } else {
         console.log('✅ Removed user from clients table:', userId);
       }
     }
 
-    // ✅ THIRD: Delete user from Supabase Auth using admin API
+    // Delete user from Supabase Auth using admin API
     const { error: deleteError } = await supabase.auth.admin.deleteUser(userId);
 
     if (deleteError) {
       console.error('Admin account deletion error:', deleteError);
       return res.status(500).json({ 
-        message: 'Failed to delete user account',
-        error: process.env.NODE_ENV === 'development' ? deleteError.message : undefined
+        success: false,
+        message: 'Failed to delete user account'
       });
     }
 
     console.log('✅ Admin deleted user account:', userId);
 
     res.status(200).json({
+      success: true,
       message: 'User account deleted successfully',
       deleted: true,
       userId: userId,
-      wasInClientsTable: !!clientData, // Inform if user was admin/pharmacist
+      wasInClientsTable: !!clientData,
       previousRole: clientData?.role || null
     });
 
   } catch (error) {
     console.error('Admin account deletion error:', error);
     res.status(500).json({ 
-      message: 'Failed to delete user account',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      success: false,
+      message: 'Failed to delete user account'
     });
   }
 };
@@ -551,6 +618,7 @@ exports.initiateGuestCheckout = async (req, res) => {
   try {
     if (!name || !phone) {
       return res.status(400).json({ 
+        success: false,
         message: 'Name and phone number are required for guest checkout' 
       });
     }
@@ -560,6 +628,7 @@ exports.initiateGuestCheckout = async (req, res) => {
       const { data, error } = await supabase.auth.getUser(email);
       if (data?.user) {
         return res.status(400).json({ 
+          success: false,
           message: `An account with email ${email} already exists. Please login instead.`,
           code: 'EMAIL_ALREADY_REGISTERED',
           existingEmail: email,
@@ -583,6 +652,7 @@ exports.initiateGuestCheckout = async (req, res) => {
     );
 
     res.status(200).json({
+      success: true,
       message: 'Guest session created successfully',
       guestToken,
       guestData: { name, phone, email }
@@ -591,6 +661,7 @@ exports.initiateGuestCheckout = async (req, res) => {
   } catch (error) {
     console.error('Guest checkout initiation error:', error);
     res.status(500).json({ 
+      success: false,
       message: 'Failed to initiate guest checkout'
     });
   }
@@ -619,6 +690,7 @@ const requireOwnUserOrAdmin = (req, res, next) => {
 
   console.log('❌ Access denied - user cannot access another user\'s data');
   return res.status(403).json({ 
+    success: false,
     message: 'Access denied. You can only access your own data.' 
   });
 };
@@ -640,6 +712,7 @@ const requireOwnUser = (req, res, next) => {
 
   console.log('❌ Access denied - user cannot access another user\'s data');
   return res.status(403).json({ 
+    success: false,
     message: 'Access denied. You can only access your own data.' 
   });
 };
@@ -650,5 +723,5 @@ exports.authenticateToken = authenticateToken;
 exports.requireAdmin = requireAdmin;
 exports.requirePharmacist = requirePharmacist;
 exports.requireAdminOrPharmacist = requireAdminOrPharmacist;
-exports.requireOwnUserOrAdmin = requireOwnUserOrAdmin; // Add this
-exports.requireOwnUser = requireOwnUser; // Add this
+exports.requireOwnUserOrAdmin = requireOwnUserOrAdmin; 
+exports.requireOwnUser = requireOwnUser;

@@ -15,7 +15,7 @@ export const createPageUrl = (pageName) => {
     'AdminUsers': '/admin/users',
     'AdminAnalytics': '/admin/analytics',
     
-    // Pharmacist Routes - ADD THESE MISSING ROUTES
+    // Pharmacist Routes
     'PharmacistDashboard': '/pharmacist',
     'PharmacistInventory': '/pharmacist/inventory',
     'PharmacistAddMedication': '/pharmacist/add-medication',
@@ -25,11 +25,12 @@ export const createPageUrl = (pageName) => {
     'PharmacistPrescriptions': '/pharmacist/prescriptions',
     'PharmacistAnalytics': '/pharmacist/analytics',
     'PharmacistSettings': '/pharmacist/settings',
-    'PharmacistProfile': '/pharmacist/profile', // This was missing!
+    'PharmacistProfile': '/pharmacist/profile',
     
-    // Customer Routes
+    // Customer Routes - ADD THE MISSING ONES!
     'CustomerHome': '/',
     'CustomerMedications': '/medications',
+    'CustomerMedicationDetails': '/medications', 
     'CustomerProfile': '/profile',
     'CustomerOrders': '/orders',
     'CustomerCart': '/cart',
@@ -37,8 +38,10 @@ export const createPageUrl = (pageName) => {
     'CustomerLogin': '/login',
     'CustomerRegister': '/register',
     'CustomerPrescriptions': '/prescriptions',
-    'CustomerOrderTracking': '/orders',
+    'CustomerPrescriptionUpload': '/prescriptions/upload', 
+    'CustomerOrderTracking': '/orders', 
     'OrderSuccess': '/order-success',
+    'ChatbotPage': '/chatbot',
   };
   
   return pageMap[pageName] || '/';

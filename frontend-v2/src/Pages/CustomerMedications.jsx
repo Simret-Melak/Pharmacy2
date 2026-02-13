@@ -27,14 +27,14 @@ import CustomerFooter from '@/components/customer/CustomerFooter';
 import MedicationCard from '@/components/ui-custom/MedicationCard'; 
 import PageHeader from '@/components/ui-custom/PageHeader';
 import SearchInput from '@/components/ui-custom/SearchInput';
-import { useCart } from '@/context/CartContext'; // ADD THIS
-import { Search, SlidersHorizontal, Grid, List, X, Loader2 } from 'lucide-react';
+import { useCart } from '@/context/CartContext';
+import { Search, SlidersHorizontal, Grid, List, X, Loader2, Upload } from 'lucide-react';
 
 const categories = ['All', 'Pain Relief', 'Antibiotics', 'Vitamins', 'Allergy', 'Diabetes', 'Heart Health', 'Digestive'];
 
 export default function CustomerMedications() {
   const navigate = useNavigate();
-  const { addToCart } = useCart(); // USE CART CONTEXT
+  const { addToCart } = useCart();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [priceRange, setPriceRange] = useState([0, 100]);
@@ -49,6 +49,9 @@ export default function CustomerMedications() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [addingToCart, setAddingToCart] = useState({});
+  
+  // Add state for upload prescription mode
+  const [uploadPrescriptionMode, setUploadPrescriptionMode] = useState(false);
 
   // Get URL parameters
   useEffect(() => {
@@ -57,6 +60,7 @@ export default function CustomerMedications() {
       const categoryFromUrl = urlParams.get('category');
       const searchFromUrl = urlParams.get('search');
       const pageFromUrl = urlParams.get('page');
+      const uploadMode = urlParams.get('uploadPrescription');
       
       if (categoryFromUrl) {
         setSelectedCategory(categoryFromUrl);
@@ -66,6 +70,9 @@ export default function CustomerMedications() {
       }
       if (pageFromUrl) {
         setCurrentPage(parseInt(pageFromUrl) || 1);
+      }
+      if (uploadMode === 'true') {
+        setUploadPrescriptionMode(true);
       }
     }
   }, []);
@@ -190,15 +197,43 @@ export default function CustomerMedications() {
     window.history.pushState({}, '', url);
   };
 
-  // UPDATED: Simplified add to cart using context
+  // UPDATED: Handle add to cart with prescription upload flow
   const handleAddToCart = async (medication) => {
-    // Check if prescription is required
-    if (medication.is_prescription_required) {
-      alert('This medication requires a prescription. Please contact a pharmacist.');
-      navigate('/prescriptions');
+    // Check if we're in prescription upload mode
+    if (uploadPrescriptionMode) {
+      // If medication requires prescription, navigate to upload page
+      if (medication.is_prescription_required) {
+        navigate(createPageUrl(`CustomerPrescriptionUpload/${medication.id}`));
+      } else {
+        // If medication doesn't require prescription, ask user
+        const confirmAdd = window.confirm(
+          `"${medication.name}" doesn't require a prescription. Would you like to add it to cart instead?`
+        );
+        if (confirmAdd) {
+          addToCartDirectly(medication);
+        }
+      }
       return;
     }
 
+    // Normal mode: Check if prescription is required
+    if (medication.is_prescription_required) {
+      const shouldUpload = window.confirm(
+        `"${medication.name}" requires a prescription. Would you like to upload a prescription now?`
+      );
+      
+      if (shouldUpload) {
+        navigate(createPageUrl(`CustomerPrescriptionUpload/${medication.id}`));
+      }
+      return;
+    }
+
+    // Add non-prescription medication to cart
+    addToCartDirectly(medication);
+  };
+
+  // Helper function to add to cart
+  const addToCartDirectly = async (medication) => {
     setAddingToCart(prev => ({ ...prev, [medication.id]: true }));
 
     try {
@@ -216,7 +251,18 @@ export default function CustomerMedications() {
     }
   };
 
-  // ... Rest of your component (FilterSidebar, JSX) remains the same ...
+  // Handle medication clicks differently in upload mode
+  const handleMedicationClick = (medication) => {
+    if (uploadPrescriptionMode) {
+      // In upload mode, clicking on medication should go to upload page if Rx required
+      if (medication.is_prescription_required) {
+        navigate(createPageUrl(`CustomerPrescriptionUpload/${medication.id}`));
+      } else {
+        alert(`"${medication.name}" doesn't require a prescription. Select a medication that requires a prescription.`);
+      }
+    }
+    // In normal mode, clicking on the card doesn't do anything (or you could add navigation to details)
+  };
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -224,12 +270,40 @@ export default function CustomerMedications() {
       
       <div className="container mx-auto px-4 py-8">
         <PageHeader
-          title="All Medications"
-          description="Browse our complete catalog of medications and health products"
+          title={uploadPrescriptionMode ? "Select Medication for Prescription Upload" : "All Medications"}
+          description={
+            uploadPrescriptionMode 
+              ? "Choose a medication that requires a prescription to upload your prescription file"
+              : "Browse our complete catalog of medications and health products"
+          }
           breadcrumbs={[
             { label: 'Medications' }
           ]}
         />
+
+        {/* Upload Prescription Mode Banner */}
+        {uploadPrescriptionMode && (
+          <div className="mb-6 bg-emerald-50 border border-emerald-200 rounded-2xl p-6">
+            <div className="flex items-center gap-4">
+              <div className="h-12 w-12 rounded-full bg-emerald-100 flex items-center justify-center">
+                <Upload className="h-6 w-6 text-emerald-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-emerald-900">Select a medication to upload prescription</h3>
+                <p className="text-sm text-emerald-700 mt-1">
+                  Choose a medication below to upload your prescription. Only medications that require prescriptions will take you to the upload page.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => navigate(createPageUrl('CustomerMedications'))}
+                className="border-emerald-200 text-emerald-700 hover:bg-emerald-100"
+              >
+                Cancel Upload
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Search and Filters Bar */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 mb-6">
@@ -388,7 +462,8 @@ export default function CustomerMedications() {
                     <MedicationCard 
                       key={med.id}
                       medication={med}
-                      onAddToCart={() => handleAddToCart(med)} // Pass the function
+                      onAddToCart={() => handleAddToCart(med)}
+                      onClick={() => handleMedicationClick(med)}
                       isAddingToCart={addingToCart[med.id] || false}
                     />
                   ))}
@@ -447,7 +522,7 @@ export default function CustomerMedications() {
     </div>
   );
 
-  // FilterSidebar function remains exactly the same as before
+  // FilterSidebar function with updated clear filters
   function FilterSidebar() {
     return (
       <div className="space-y-6">
@@ -502,7 +577,12 @@ export default function CustomerMedications() {
         <Button
           variant="outline"
           className="w-full"
-          onClick={handleClearFilters}
+          onClick={() => {
+            handleClearFilters();
+            if (uploadPrescriptionMode) {
+              navigate(createPageUrl('CustomerMedications?uploadPrescription=true'));
+            }
+          }}
         >
           Clear Filters
         </Button>

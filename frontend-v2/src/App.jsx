@@ -1,7 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { CartProvider } from '@/context/CartContext';
-// REMOVE: import { AuthProvider } from './context/AuthContext'; // DELETE THIS LINE
 
 // Customer Pages
 import CustomerLogin from './Pages/CustomerLogin';
@@ -10,6 +9,7 @@ import CustomerRegister from './Pages/CustomerRegister';
 import CustomerMedications from './Pages/CustomerMedications';
 import CustomerMedicationDetails from './Pages/CustomerMedicationDetails';
 import CustomerPrescriptions from './Pages/CustomerPrescriptions';
+import CustomerPrescriptionUpload from './Pages/CustomerPrescriptionUpload';
 import CustomerCart from './Pages/CustomerCart';
 import CustomerCheckout from './Pages/CustomerCheckout';
 import CustomerOrders from './Pages/CustomerOrders';
@@ -82,7 +82,6 @@ function App() {
   };
 
   return (
-    // WRAP ONLY WITH CART PROVIDER
     <CartProvider>
       <Router>
         <Routes>
@@ -95,6 +94,7 @@ function App() {
           <Route path="/medications" element={<CustomerMedications />} />
           <Route path="/medications/:id" element={<CustomerMedicationDetails />} />
           <Route path="/prescriptions" element={<CustomerPrescriptions />} />
+          <Route path="/prescriptions/upload/:medicationId" element={<CustomerPrescriptionUpload />} />
           <Route path="/cart" element={<CustomerCart />} />
           <Route path="/checkout" element={<CustomerCheckout />} />
           <Route path="/orders" element={<CustomerOrders />} />

@@ -7,14 +7,38 @@ import { Badge } from '@/components/ui/badge';
 const MedicationCard = ({ medication, onAddToCart, isAddingToCart = false }) => { // Add isAddingToCart
   const navigate = useNavigate();
 
-  const handleAddToCart = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    console.log('Add to cart clicked for:', medication.id, medication.name);
-    if (onAddToCart && !isAddingToCart) { // Prevent clicking while loading
-      onAddToCart(medication);
+  // In your MedicationCard component
+const handleAddToCart = (medication) => {
+  // Check if user is logged in
+  const token = localStorage.getItem('token');
+  if (!token) {
+    navigate(createPageUrl('CustomerLogin'));
+    return;
+  }
+
+  // Check if prescription is required
+  if (medication.is_prescription_required) {
+    // Check if we're in upload mode
+    const isUploadMode = window.location.search.includes('uploadPrescription=true');
+    
+    if (isUploadMode) {
+      // Navigate directly to upload page
+      navigate(createPageUrl(`CustomerPrescriptionUpload/${medication.id}`));
+    } else {
+      // Show option to upload prescription
+      const shouldUpload = window.confirm(
+        `"${medication.name}" requires a prescription. Would you like to upload a prescription now?`
+      );
+      
+      if (shouldUpload) {
+        navigate(createPageUrl(`CustomerPrescriptionUpload/${medication.id}`));
+      }
     }
-  };
+  } else {
+    // Add non-prescription medication to cart
+    addToCart(medication);
+  }
+};
 
   const handleViewDetails = (e) => {
     e.preventDefault();

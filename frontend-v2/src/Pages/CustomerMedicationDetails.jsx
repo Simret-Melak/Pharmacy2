@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { createPageUrl } from '@/utils';
 import { api, medicationAPI } from '@/utils/api';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -26,7 +27,8 @@ import {
   Clock,
   Thermometer,
   Droplets,
-  AlertTriangle
+  AlertTriangle,
+  Upload
 } from 'lucide-react';
 
 export default function CustomerMedicationDetails() {
@@ -55,114 +57,98 @@ export default function CustomerMedicationDetails() {
   }, [id]);
 
   const fetchMedicationDetails = async () => {
-  try {
-    setLoading(true);
-    setError('');
-    console.log('📡 API Call: Fetching medication by ID:', id);
-    
-    const response = await medicationAPI.getMedicationById(id);
-    console.log('📡 Full API Response:', response);
-    
-    if (response.success && response.medication) {
-      console.log('✅ Medication found:', response.medication.name);
-      console.log('📊 Full medication data:', response.medication);
+    try {
+      setLoading(true);
+      setError('');
+      console.log('📡 API Call: Fetching medication by ID:', id);
       
-      // Map ALL backend data directly - no need for manual mapping
-      const medData = response.medication;
+      const response = await medicationAPI.getMedicationById(id);
+      console.log('📡 API Response:', response);
       
-      // Create a comprehensive medication object with ALL fields
-      const fullMedication = {
-        // Core identification
-        id: medData.id,
-        name: medData.name || 'Unnamed Medication',
-        sku: medData.sku || '',
+      if (response.success && response.medication) {
+        console.log('✅ Medication found:', response.medication.name);
         
-        // Description
-        description: medData.description || '',
-        
-        // Pricing
-        price: parseFloat(medData.price) || 0,
-        
-        // Stock information
-        stock_quantity: medData.stock_quantity || 0,
-        online_stock: medData.online_stock || medData.stock_quantity || 0,
-        in_person_stock: medData.in_person_stock || 0,
-        low_stock_threshold: medData.low_stock_threshold || 10,
-        stock_type: medData.stock_type || 'Online Only',
-        
-        // Classification
-        category: medData.category || '',
-        dosage: medData.dosage || '',
-        drug_class: medData.drug_class || '',
-        route_of_administration: medData.route_of_administration || 'Oral',
-        generic_name: medData.generic_name || '',
-        brand_name: medData.brand_name || '',
-        is_prescription_required: medData.is_prescription_required || false,
-        
-        // Manufacturer
-        manufacturer: medData.manufacturer || 'Unknown Manufacturer',
-        
-        // Images
-        image_url: medData.image_url || 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=800',
-        image_key: medData.image_key || '',
-        image_size: medData.image_size || 0,
-        image_mime_type: medData.image_mime_type || '',
-        
-        // Medical information
-        active_ingredients: medData.active_ingredients || '',
-        storage_instructions: medData.storage_instructions || 'Store at room temperature away from moisture and heat.',
-        usage_dosage: medData.usage_dosage || '',
-        warnings: medData.warnings || '',
-        side_effects: medData.side_effects || '',
-        contraindications: medData.contraindications || '',
-        interactions: medData.interactions || '',
-        pregnancy_category: medData.pregnancy_category || '',
-        
-        // Usage instructions
-        frequency: medData.frequency || '',
-        duration: medData.duration || '',
-        administration_instructions: medData.administration_instructions || '',
-        special_instructions: medData.special_instructions || '',
-        
-        // Metadata
-        created_at: medData.created_at || new Date().toISOString(),
-        updated_at: medData.updated_at || new Date().toISOString(),
-        pharmacy_id: medData.pharmacy_id || '',
-        created_by: medData.created_by || '',
-        
-        // Pharmacy information (if included in backend response)
-        pharmacy: medData.pharmacy || medData.pharmacies || null,
-        
-        // Derived fields for display
-        display_quantity: `${medData.dosage || '30'} units`,
-        quantity: medData.dosage || 'Not specified',
-      };
+        // Map all backend data to frontend structure
+        const medData = response.medication;
+        setMedication({
+          // Core fields
+          id: medData.id,
+          name: medData.name,
+          description: medData.description || '',
+          price: parseFloat(medData.price) || 0,
+          
+          // Stock & inventory
+          stock_quantity: medData.stock_quantity || 0,
+          online_stock: medData.online_stock || 0,
+          in_person_stock: medData.in_person_stock || 0,
+          low_stock_threshold: medData.low_stock_threshold || 10,
+          stock_type: medData.stock_type || 'Online Only',
+          
+          // Classification
+          category: medData.category || '',
+          dosage: medData.dosage || '',
+          drug_class: medData.drug_class || '',
+          route_of_administration: medData.route_of_administration || '',
+          generic_name: medData.generic_name || '',
+          brand_name: medData.brand_name || '',
+          is_prescription_required: medData.is_prescription_required || false,
+          
+          // Manufacturer & SKU
+          manufacturer: medData.manufacturer || 'Unknown Manufacturer',
+          sku: medData.sku || `MED-${medData.id?.substring(0, 8).toUpperCase() || 'N/A'}`,
+          
+          // Images
+          image_url: medData.image_url || 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=800',
+          image_key: medData.image_key || '',
+          image_size: medData.image_size || 0,
+          image_mime_type: medData.image_mime_type || '',
+          
+          // Medical information
+          active_ingredients: medData.active_ingredients || 'See product description for active ingredients',
+          storage_instructions: medData.storage_instructions || 'Store at room temperature away from moisture and heat. Keep out of reach of children.',
+          usage_dosage: medData.usage_dosage || 'Take as directed by your physician. Follow the dosage instructions provided by your healthcare provider.',
+          warnings: medData.warnings || (medData.is_prescription_required 
+            ? 'This medication requires a prescription. Do not use without consulting a healthcare professional.'
+            : 'Consult your doctor before use if you have any medical conditions or are taking other medications.'),
+          side_effects: medData.side_effects || 'May cause side effects. Consult your doctor if you experience any adverse reactions.',
+          contraindications: medData.contraindications || 'Do not use if allergic to any ingredients. Consult your doctor for contraindications.',
+          interactions: medData.interactions || 'May interact with other medications. Inform your doctor of all medicines you are taking.',
+          pregnancy_category: medData.pregnancy_category || '',
+          
+          // Usage instructions
+          frequency: medData.frequency || '',
+          duration: medData.duration || '',
+          administration_instructions: medData.administration_instructions || '',
+          special_instructions: medData.special_instructions || '',
+          
+          // Metadata
+          created_at: medData.created_at,
+          updated_at: medData.updated_at,
+          pharmacy_id: medData.pharmacy_id,
+          created_by: medData.created_by,
+          
+          // Calculated/derived fields
+          quantity: medData.dosage ? `${medData.dosage} per unit` : 'Dosage not specified',
+          display_quantity: `${medData.dosage || '30'} units per package`,
+        });
+      } else {
+        console.log('❌ Medication not found in response');
+        setError('Medication not found');
+      }
+    } catch (err) {
+      console.error('❌ Error fetching medication details:', err);
       
-      console.log('📦 Full medication object created:', fullMedication);
-      setMedication(fullMedication);
-      
-    } else {
-      console.log('❌ Medication not found in response:', response);
-      setError(response.message || 'Medication not found');
+      if (err.message.includes('401')) {
+        setError('Please login to view medication details');
+      } else if (err.message.includes('404')) {
+        setError('Medication not found');
+      } else {
+        setError(err.message || 'Failed to load medication details');
+      }
+    } finally {
+      setLoading(false);
     }
-  } catch (err) {
-    console.error('❌ Error fetching medication details:', err);
-    console.error('❌ Error stack:', err.stack);
-    
-    // More specific error messages
-    if (err.response?.status === 401) {
-      setError('Please login to view medication details');
-    } else if (err.response?.status === 404) {
-      setError('Medication not found');
-    } else if (err.message.includes('Network Error')) {
-      setError('Cannot connect to server. Please check your connection.');
-    } else {
-      setError(err.message || 'Failed to load medication details');
-    }
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   const fetchRelatedMedications = async () => {
     try {
@@ -194,19 +180,30 @@ export default function CustomerMedicationDetails() {
     }
   };
 
+  // ✅ FIXED: Handle add to cart with proper prescription flow
   const handleAddToCart = async () => {
     console.log('🛒 Add to cart clicked');
     
     const token = localStorage.getItem('token');
     if (!token) {
       console.log('🔐 User not logged in, redirecting to login');
-      navigate('/login');
+      navigate(createPageUrl('CustomerLogin'));
       return;
     }
 
+    // ✅ FIXED: Navigate to the correct prescription upload route
     if (medication.is_prescription_required) {
-      console.log('📄 Prescription required, redirecting to prescriptions');
-      navigate('/prescriptions');
+      console.log('📄 Prescription required, navigating to upload page for medication:', medication.id);
+      
+      // ✅ OPTION 1: Direct path to match your backend route
+      navigate(`/prescriptions/upload/${medication.id}`);
+      
+      // ✅ OPTION 2: If using createPageUrl, uncomment this and comment the line above
+      // navigate(`/prescriptions/upload/${medication.id}`);
+      
+      // ✅ OPTION 3: Or if you have a specific route pattern in createPageUrl
+      // navigate(createPageUrl(`PrescriptionUpload/${medication.id}`));
+      
       return;
     }
 
@@ -219,6 +216,7 @@ export default function CustomerMedicationDetails() {
 
     try {
       console.log('Adding to cart:', { medicationId: medication.id, quantity });
+      // TODO: Implement actual add to cart API call
       await new Promise(resolve => setTimeout(resolve, 1000));
       alert(`Added ${quantity} ${medication.name} to cart!`);
       
@@ -233,7 +231,7 @@ export default function CustomerMedicationDetails() {
   const handleAddToFavorites = async () => {
     const token = localStorage.getItem('token');
     if (!token) {
-      navigate('/login');
+      navigate(createPageUrl('CustomerLogin'));
       return;
     }
 
@@ -328,7 +326,7 @@ export default function CustomerMedicationDetails() {
               <Button onClick={fetchMedicationDetails} variant="outline">
                 Try Again
               </Button>
-              <Link to="/medications">
+              <Link to={createPageUrl('CustomerMedications')}>
                 <Button variant="default" className="bg-emerald-600">
                   Browse Medications
                 </Button>
@@ -485,25 +483,16 @@ export default function CustomerMedicationDetails() {
                 </div>
               </div>
 
-              {/* Actions */}
+              {/* Actions - ✅ FIXED: Prescription upload navigation */}
               <div className="flex gap-3">
                 {medication.is_prescription_required ? (
-                  <Link 
-                    to="/prescriptions"
-                    className="flex-1"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      navigate('/prescriptions', {
-                        state: { medicationId: medication.id }
-                      });
-                    }}
-                  >
+                  <Link to={`/prescriptions/upload/${medication.id}`} className="flex-1">
                     <Button 
                       size="lg" 
                       className="w-full bg-emerald-600 hover:bg-emerald-700 rounded-xl h-14"
                       disabled={medication.online_stock <= 0}
                     >
-                      <FileText className="h-5 w-5 mr-2" />
+                      <Upload className="h-5 w-5 mr-2" />
                       Upload Prescription
                     </Button>
                   </Link>
@@ -730,7 +719,7 @@ export default function CustomerMedicationDetails() {
           <section className="mt-12">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-slate-900">Related Medications</h2>
-              <Link to="/medications">
+              <Link to={createPageUrl('CustomerMedications')}>
                 <Button variant="ghost" className="text-emerald-600">
                   View All
                   <ArrowRight className="ml-2 h-4 w-4" />
